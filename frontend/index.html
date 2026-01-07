@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Caseworker Agent</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <h1>Mini Agentic Caseworker</h1>
+        <p class="subtitle">
+          CaseCompass-style Tier 1–4 tagging + agent actions
+        </p>
+      </header>
+
+      <!-- Hot Topics -->
+      <section
+        class="hot-topics-section"
+        id="hotTopicsSection"
+        style="display: none;"
+      >
+        <h2>Hot Topics</h2>
+
+        <div class="hot-topics-grid">
+          <div class="hot-topic-card">
+            <h3>By Issue Area</h3>
+            <div id="issueAreaStats"></div>
+          </div>
+
+          <div class="hot-topic-card">
+            <h3>By Problem (Tier 4)</h3>
+            <div id="problemStats"></div>
+          </div>
+
+          <div class="hot-topic-card">
+            <h3>By Sentiment</h3>
+            <div id="sentimentStats"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Single Case -->
+      <section class="single-case-section">
+        <h2>Quick Case Entry</h2>
+
+        <div class="single-case-form">
+          <input
+            type="text"
+            id="singleSubject"
+            placeholder="Subject (e.g., VA disability delay)"
+          />
+
+          <textarea
+            id="singleBody"
+            placeholder="Constituent message..."
+          ></textarea>
+
+          <button id="runSingleAgent" class="primary">
+            Run Agent
+          </button>
+        </div>
+      </section>
+
+      <!-- Batch Input -->
+      <section class="input-section">
+        <div class="section-header">
+          <h2>Batch Input</h2>
+
+          <div>
+            <button id="loadSaved">Load Saved Results</button>
+            <button id="loadSample">Load Sample Cases</button>
+          </div>
+        </div>
+
+        <textarea
+          id="inputJson"
+          placeholder="Paste JSON array of cases here..."
+        ></textarea>
+
+        <button id="runAgent" class="primary">
+          Run Agent on Batch
+        </button>
+      </section>
+
+      <!-- Results -->
+      <section
+        class="results-section"
+        id="resultsSection"
+        style="display: none;"
+      >
+        <h2>Results</h2>
+
+        <table id="resultsTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Issue Area</th>
+              <th>Sentiment</th>
+              <th>Tier 1 → 4 Path</th>
+              <th>Actions</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Modal -->
+      <div class="modal" id="modal" style="display:none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="modalTitle">Case Details</h3>
+            <button id="closeModal">&times;</button>
+          </div>
+          <div id="modalBody">
+            <div class="modal-tabs">
+              <button class="tab-btn active" data-tab="timeline">Action Plan</button>
+              <button class="tab-btn" data-tab="drafts">Drafts</button>
+            </div>
+            <div id="timelineTab" class="tab-content active"></div>
+            <div id="draftsTab" class="tab-content" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+      
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
