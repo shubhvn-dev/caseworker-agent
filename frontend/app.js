@@ -21,7 +21,6 @@ const runSingleAgentBtn = document.getElementById("runSingleAgent");
 let currentResults = [];
 
 
-// Load sample cases
 loadSampleBtn.addEventListener("click", async () => {
   const res = await fetch(`${API_URL}/sample-cases`);
   const data = await res.json();
@@ -29,7 +28,6 @@ loadSampleBtn.addEventListener("click", async () => {
 });
 
 
-// Load saved results
 loadSavedBtn.addEventListener("click", async () => {
   const res = await fetch(`${API_URL}/cases`);
   const data = await res.json();
@@ -45,7 +43,6 @@ loadSavedBtn.addEventListener("click", async () => {
 });
 
 
-// Run agent on batch
 runAgentBtn.addEventListener("click", async () => {
   let cases;
   try {
@@ -84,7 +81,6 @@ runAgentBtn.addEventListener("click", async () => {
 });
 
 
-// Run agent on single case
 runSingleAgentBtn.addEventListener("click", async () => {
   const subject = singleSubject.value.trim();
   const body = singleBody.value.trim();
@@ -130,73 +126,69 @@ runSingleAgentBtn.addEventListener("click", async () => {
 
 
 function renderResults() {
-    resultsBody.innerHTML = "";
-    resultsSection.style.display = "block";
-  
-    currentResults.forEach((r, idx) => {
-      const row = document.createElement("tr");
-  
-      const path = `${r.tags.tier1} → ${r.tags.tier2} → ${r.tags.tier3} → ${r.tags.tier4}`;
-  
-      const issueAreaClass = r.issue_area.toLowerCase().replace(" ", "-");
-  
-      // Find current step (first "pending" or "waiting" step)
-      const stepCount = r.action_plan ? r.action_plan.length : 0;
-      let currentStep = stepCount; // Default to last step if all complete
-  
-      if (r.action_plan) {
-        for (let i = 0; i < r.action_plan.length; i++) {
-          if (r.action_plan[i].status === "pending" || r.action_plan[i].status === "waiting") {
-            currentStep = i + 1;
-            break;
-          }
+  resultsBody.innerHTML = "";
+  resultsSection.style.display = "block";
+
+  currentResults.forEach((r, idx) => {
+    const row = document.createElement("tr");
+
+    const path = `${r.tags.tier1} → ${r.tags.tier2} → ${r.tags.tier3} → ${r.tags.tier4}`;
+
+    const issueAreaClass = r.issue_area.toLowerCase().replace(" ", "-");
+
+    const stepCount = r.action_plan ? r.action_plan.length : 0;
+    let currentStep = stepCount;
+
+    if (r.action_plan) {
+      for (let i = 0; i < r.action_plan.length; i++) {
+        if (r.action_plan[i].status === "pending" || r.action_plan[i].status === "waiting") {
+          currentStep = i + 1;
+          break;
         }
       }
-  
-      const currentAction =
-        r.action_plan && r.action_plan[currentStep - 1]
-          ? r.action_plan[currentStep - 1].action
-          : "N/A";
-  
-      row.innerHTML = `
-        <td>${r.id}</td>
-        <td><span class="issue-badge ${issueAreaClass}">${r.issue_area}</span></td>
-        <td><span class="sentiment-badge ${r.sentiment}">${r.sentiment}</span></td>
-        <td class="path-cell">${path}</td>
-        <td>
-          <button class="action-progress-btn" data-idx="${idx}">
-            <span class="progress-label">Step ${currentStep}/${stepCount}</span>
-            <span class="progress-action">${currentAction}</span>
-          </button>
-        </td>
-        <td><button class="view-btn" data-idx="${idx}">View Details</button></td>
-      `;
-  
-      resultsBody.appendChild(row);
+    }
+
+    const currentAction =
+      r.action_plan && r.action_plan[currentStep - 1]
+        ? r.action_plan[currentStep - 1].action
+        : "N/A";
+
+    row.innerHTML = `
+      <td>${r.id}</td>
+      <td><span class="issue-badge ${issueAreaClass}">${r.issue_area}</span></td>
+      <td><span class="sentiment-badge ${r.sentiment}">${r.sentiment}</span></td>
+      <td class="path-cell">${path}</td>
+      <td>
+        <button class="action-progress-btn" data-idx="${idx}">
+          <span class="progress-label">Step ${currentStep}/${stepCount}</span>
+          <span class="progress-action">${currentAction}</span>
+        </button>
+      </td>
+      <td><button class="view-btn" data-idx="${idx}">View Details</button></td>
+    `;
+
+    resultsBody.appendChild(row);
+  });
+
+  document.querySelectorAll(".view-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = e.target.dataset.idx;
+      showCaseDetails(currentResults[idx]);
     });
-  
-    // View Details handler
-    document.querySelectorAll(".view-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const idx = e.target.dataset.idx;
-        showCaseDetails(currentResults[idx]);
-      });
+  });
+
+  document.querySelectorAll(".action-progress-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = e.target.closest(".action-progress-btn").dataset.idx;
+      showCaseDetails(currentResults[idx], "timeline");
     });
-  
-    // Action Progress handler - opens modal to Action Plan tab
-    document.querySelectorAll(".action-progress-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const idx = e.target.closest(".action-progress-btn").dataset.idx;
-        showCaseDetails(currentResults[idx], "timeline");
-      });
-    });
-  }
-  
+  });
+}
+
 
 function showCaseDetails(result, defaultTab = "timeline") {
   modalTitle.textContent = `Case #${result.id}`;
 
-  // Render timeline with Mark Complete button on FIRST pending/waiting step only
   let firstPendingFound = false;
 
   const timelineHtml =
@@ -236,7 +228,6 @@ function showCaseDetails(result, defaultTab = "timeline") {
 
   document.getElementById("timelineTab").innerHTML = timelineHtml;
 
-  // Attach mark complete handler
   document.querySelectorAll(".mark-complete-btn").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const caseId = e.target.dataset.caseId;
@@ -277,38 +268,51 @@ function showCaseDetails(result, defaultTab = "timeline") {
     });
   });
 
-  // Render drafts with copy button
-  const draftsHtml = result.drafts
-    .map(
-      (d, i) => `
-      <div class="draft-card">
-        <div class="draft-header">
-          <span class="draft-type">${d.type}</span>
-          <button class="copy-btn" data-draft="${i}">Copy</button>
-        </div>
-        <div class="draft-subject">${d.subject}</div>
-        <div class="draft-body">${d.body}</div>
-      </div>
-    `
-    )
-    .join("");
+  const draftsContainer = document.getElementById("draftsTab");
+  draftsContainer.innerHTML = '<p class="loading">Loading drafts for current stage...</p>';
 
-  document.getElementById("draftsTab").innerHTML = draftsHtml;
+  fetchStageDrafts(result).then(({ drafts, current_stage }) => {
+    if (!drafts || drafts.length === 0) {
+      draftsContainer.innerHTML = '<p>No drafts available.</p>';
+      return;
+    }
 
-  // Attach copy handlers
-  document.querySelectorAll(".copy-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = e.target.dataset.draft;
-      const draft = result.drafts[idx];
-      const text = `Subject: ${draft.subject}\n\n${draft.body}`;
-      navigator.clipboard.writeText(text).then(() => {
-        e.target.textContent = "Copied!";
-        setTimeout(() => (e.target.textContent = "Copy"), 1500);
+    const draftsHtml = `
+      <div class="stage-indicator">📍 Current Stage: Step ${current_stage}</div>
+      ${drafts.map((d, i) => {
+        const recipientClass = d.recipient.toLowerCase().includes('agency') 
+          ? 'agency' 
+          : d.recipient.toLowerCase().includes('supervisor') 
+            ? 'supervisor' 
+            : 'constituent';
+        return `
+          <div class="draft-card">
+            <div class="draft-header">
+              <span class="draft-type">${formatLetterType(d.type)}</span>
+              <span class="draft-recipient-tag ${recipientClass}">To: ${d.recipient}</span>
+            </div>
+            <div class="draft-body">${d.content}</div>
+            <button class="copy-btn" data-draft="${i}">📋 Copy to Clipboard</button>
+          </div>
+        `;
+      }).join('')}
+    `;
+
+    draftsContainer.innerHTML = draftsHtml;
+    draftsContainer.draftsData = drafts;
+
+    draftsContainer.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = e.target.dataset.draft;
+        const draft = draftsContainer.draftsData[idx];
+        navigator.clipboard.writeText(draft.content).then(() => {
+          e.target.textContent = "✓ Copied!";
+          setTimeout(() => (e.target.textContent = "📋 Copy to Clipboard"), 1500);
+        });
       });
     });
   });
 
-  // Set active tab based on parameter
   document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"));
   document.querySelector(`.tab-btn[data-tab="${defaultTab}"]`).classList.add("active");
   document.getElementById("timelineTab").style.display = defaultTab === "timeline" ? "block" : "none";
@@ -318,7 +322,6 @@ function showCaseDetails(result, defaultTab = "timeline") {
 }
 
 
-// Tab switching
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("tab-btn")) {
     const tab = e.target.dataset.tab;
@@ -372,6 +375,33 @@ function renderStatBars(counts, total) {
       `;
     })
     .join("");
+}
+
+
+async function fetchStageDrafts(caseData) {
+  try {
+    const res = await fetch(`${API_URL}/generate-drafts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseData })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error("Error fetching drafts:", e);
+    return { drafts: [], current_stage: 1 };
+  }
+}
+
+
+function formatLetterType(type) {
+  const labels = {
+    acknowledgment: "📨 Acknowledgment Letter",
+    agency_inquiry: "🏛️ Agency Inquiry",
+    followup: "📝 Follow-up Letter",
+    escalation: "⚠️ Escalation Letter",
+    resolution: "✅ Resolution Notice"
+  };
+  return labels[type] || type;
 }
 
 

@@ -6,16 +6,19 @@ from pydantic import BaseModel
 from typing import List
 from dotenv import load_dotenv
 
-from .lib.agent import run_agent_for_case
+from .lib.agent import run_agent_for_case, generate_stage_drafts
 from .lib.sample_cases import SAMPLE_CASES
 from .lib.database import init_db, get_all_cases, advance_case_step
 
+
 load_dotenv()
+
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
 
-# Simple in-memory rate limiting for production
+
 daily_calls = {}
+
 
 def check_daily_limit(ip: str) -> bool:
     """Returns True if allowed, False if limit exceeded."""
@@ -25,7 +28,6 @@ def check_daily_limit(ip: str) -> bool:
     from datetime import date
     today = str(date.today())
     
-    # Reset if new day
     if ip not in daily_calls or daily_calls[ip]["date"] != today:
         daily_calls[ip] = {"date": today, "count": 0}
     
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Caseworker Agent API", lifespan=lifespan)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,7 +81,6 @@ async def get_cases():
 
 @app.post("/run-agent")
 async def run_agent(request: Request, cases: List[CaseInput]):
-    # Get client IP
     client_ip = request.client.host
     
     if not check_daily_limit(client_ip):
@@ -100,3 +102,15 @@ async def advance_case(case_id: str):
     if result:
         return {"success": True, "case": result}
     return {"success": False, "message": "Case not found"}
+
+
+@app.post("/generate-drafts")
+async def generate_drafts(request: Request):
+    data = await request.json()
+    case_data = data.get("caseData")
+    
+    if not case_data:
+        raise HTTPException(status_code=400, detail="caseData required")
+    
+    result = await generate_stage_drafts(case_data)
+    return result
