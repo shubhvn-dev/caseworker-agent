@@ -1,4 +1,6 @@
-const API_URL = "http://localhost:8000";
+const API_URL = window.location.hostname === "localhost" 
+  ? "http://localhost:8000" 
+  : "https://caseworker-agent.onrender.com";
 
 const inputJson = document.getElementById("inputJson");
 const loadSampleBtn = document.getElementById("loadSample");
