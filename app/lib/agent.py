@@ -202,3 +202,54 @@ Respond with exactly one word: positive, neutral, or negative"""
         return "negative"
     else:
         return "neutral"
+
+async def generate_followup_draft(case_data: dict, completed_step: dict) -> dict:
+    """Generate a follow-up draft after completing an action step."""
+    
+    prompt = f"""You are a caseworker assistant. A step has been completed on a constituent case.
+
+CASE INFORMATION:
+- Case ID: {case_data['id']}
+- Issue Area: {case_data['issue_area']}
+- Sentiment: {case_data['sentiment']}
+- Original Subject: {case_data.get('subject', 'N/A')}
+
+COMPLETED STEP:
+- Action: {completed_step['action']}
+- Description: {completed_step['description']}
+
+CURRENT ACTION PLAN STATUS:
+{json.dumps(case_data['action_plan'], indent=2)}
+
+Generate a follow-up email to the constituent updating them on progress.
+
+Respond in this exact JSON format:
+{{
+    "type": "Follow-up Update",
+    "subject": "Update on Your Case #{case_data['id']}",
+    "body": "Dear Constituent,\\n\\n[Professional update about the completed action and next steps]\\n\\nSincerely,\\nConstituent Services"
+}}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=[prompt]
+        )
+        
+        result = response.text.strip()
+        
+        if result.startswith("```"):
+            result = result.split("```")[1]
+            if result.startswith("json"):
+                result = result[4:]
+        
+        return json.loads(result)
+    
+    except Exception as e:
+        print(f"Error generating follow-up: {e}")
+        return {
+            "type": "Follow-up Update",
+            "subject": f"Update on Your Case #{case_data['id']}",
+            "body": f"Dear Constituent,\n\nWe wanted to update you that we have completed the following action on your case:\n\n• {completed_step['action']}\n\nWe will continue working on your case and provide further updates.\n\nSincerely,\nConstituent Services"
+        }

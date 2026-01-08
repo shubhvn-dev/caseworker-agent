@@ -89,49 +89,50 @@ async def get_all_cases():
                 for row in rows
             ]
 
-async def advance_case_step(case_id: str):
-    """Mark current pending step as completed and advance to next."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
+async def advance_case_step(case_id: str) -> dict | None:
+    """Mark the next pending step as completed and generate follow-up draft."""
+    from .agent import generate_followup_draft
+    
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            "SELECT * FROM cases WHERE id = ?", (case_id,)
+        )
+        row = await cursor.fetchone()
         
-        # Get current case
-        async with db.execute("SELECT * FROM cases WHERE id = ?", (case_id,)) as cursor:
-            row = await cursor.fetchone()
-            if not row:
-                return None
+        if not row:
+            return None
         
-        # Parse action plan
-        action_plan = json.loads(row["action_plan"]) if row["action_plan"] else []
+        case_data = {
+            "id": row[0],
+            "subject": row[1],
+            "body": row[2],
+            "issue_area": row[3],
+            "sentiment": row[4],
+            "tags": json.loads(row[5]),
+            "action_plan": json.loads(row[6]),
+            "drafts": json.loads(row[7]),
+        }
         
-        # Find first pending step and mark as completed
-        for step in action_plan:
+        # Find and complete the next pending step
+        completed_step = None
+        for step in case_data["action_plan"]:
             if step["status"] == "pending":
                 step["status"] = "completed"
-                # Set next waiting step to pending
+                completed_step = step
                 break
         
-        # Set next waiting step to pending
-        for step in action_plan:
-            if step["status"] == "waiting":
-                step["status"] = "pending"
-                break
+        # Generate follow-up draft if a step was completed
+        if completed_step:
+            followup_draft = await generate_followup_draft(case_data, completed_step)
+            case_data["drafts"].append(followup_draft)
         
-        # Update database
+        # Save updated case
         await db.execute(
-            "UPDATE cases SET action_plan = ? WHERE id = ?",
-            (json.dumps(action_plan), case_id)
+            """UPDATE cases 
+               SET action_plan = ?, drafts = ?
+               WHERE id = ?""",
+            (json.dumps(case_data["action_plan"]), json.dumps(case_data["drafts"]), case_id)
         )
         await db.commit()
         
-        # Return updated case
-        return {
-            "id": row["id"],
-            "subject": row["subject"],
-            "body": row["body"],
-            "tags": json.loads(row["tags"]),
-            "issue_area": row["issue_area"],
-            "sentiment": row["sentiment"],
-            "actions": json.loads(row["actions"]),
-            "action_plan": action_plan,
-            "drafts": json.loads(row["drafts"]),
-        }
+        return case_data
