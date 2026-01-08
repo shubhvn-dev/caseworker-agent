@@ -2,6 +2,7 @@ const API_URL = window.location.hostname === "localhost"
   ? "http://localhost:8000" 
   : "https://caseworker-agent.onrender.com";
 
+
 const inputJson = document.getElementById("inputJson");
 const loadSampleBtn = document.getElementById("loadSample");
 const loadSavedBtn = document.getElementById("loadSaved");
@@ -16,7 +17,9 @@ const singleSubject = document.getElementById("singleSubject");
 const singleBody = document.getElementById("singleBody");
 const runSingleAgentBtn = document.getElementById("runSingleAgent");
 
+
 let currentResults = [];
+
 
 // Load sample cases
 loadSampleBtn.addEventListener("click", async () => {
@@ -24,6 +27,7 @@ loadSampleBtn.addEventListener("click", async () => {
   const data = await res.json();
   inputJson.value = JSON.stringify(data.cases, null, 2);
 });
+
 
 // Load saved results
 loadSavedBtn.addEventListener("click", async () => {
@@ -39,6 +43,7 @@ loadSavedBtn.addEventListener("click", async () => {
   renderResults();
   renderHotTopics();
 });
+
 
 // Run agent on batch
 runAgentBtn.addEventListener("click", async () => {
@@ -77,6 +82,7 @@ runAgentBtn.addEventListener("click", async () => {
     runAgentBtn.textContent = "Run Agent on Batch";
   }
 });
+
 
 // Run agent on single case
 runSingleAgentBtn.addEventListener("click", async () => {
@@ -122,94 +128,108 @@ runSingleAgentBtn.addEventListener("click", async () => {
   }
 });
 
+
 function renderResults() {
-  resultsBody.innerHTML = "";
-  resultsSection.style.display = "block";
-
-  currentResults.forEach((r, idx) => {
-    const row = document.createElement("tr");
-
-    const path = `${r.tags.tier1} → ${r.tags.tier2} → ${r.tags.tier3} → ${r.tags.tier4}`;
-
-    const issueAreaClass = r.issue_area.toLowerCase().replace(" ", "-");
-
-    // Find current step (first "pending" step)
-    const stepCount = r.action_plan ? r.action_plan.length : 0;
-    let currentStep = 1;
-    if (r.action_plan) {
-      const pendingIdx = r.action_plan.findIndex((s) => s.status === "pending");
-      currentStep = pendingIdx >= 0 ? pendingIdx + 1 : stepCount;
-    }
-
-    const currentAction =
-      r.action_plan && r.action_plan[currentStep - 1]
-        ? r.action_plan[currentStep - 1].action
-        : "N/A";
-
-    row.innerHTML = `
-      <td>${r.id}</td>
-      <td><span class="issue-badge ${issueAreaClass}">${r.issue_area}</span></td>
-      <td><span class="sentiment-badge ${r.sentiment}">${r.sentiment}</span></td>
-      <td class="path-cell">${path}</td>
-      <td>
-        <button class="action-progress-btn" data-idx="${idx}">
-          <span class="progress-label">Step ${currentStep}/${stepCount}</span>
-          <span class="progress-action">${currentAction}</span>
-        </button>
-      </td>
-      <td><button class="view-btn" data-idx="${idx}">View Details</button></td>
-    `;
-
-    resultsBody.appendChild(row);
-  });
-
-  // View Details handler
-  document.querySelectorAll(".view-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = e.target.dataset.idx;
-      showCaseDetails(currentResults[idx]);
+    resultsBody.innerHTML = "";
+    resultsSection.style.display = "block";
+  
+    currentResults.forEach((r, idx) => {
+      const row = document.createElement("tr");
+  
+      const path = `${r.tags.tier1} → ${r.tags.tier2} → ${r.tags.tier3} → ${r.tags.tier4}`;
+  
+      const issueAreaClass = r.issue_area.toLowerCase().replace(" ", "-");
+  
+      // Find current step (first "pending" or "waiting" step)
+      const stepCount = r.action_plan ? r.action_plan.length : 0;
+      let currentStep = stepCount; // Default to last step if all complete
+  
+      if (r.action_plan) {
+        for (let i = 0; i < r.action_plan.length; i++) {
+          if (r.action_plan[i].status === "pending" || r.action_plan[i].status === "waiting") {
+            currentStep = i + 1;
+            break;
+          }
+        }
+      }
+  
+      const currentAction =
+        r.action_plan && r.action_plan[currentStep - 1]
+          ? r.action_plan[currentStep - 1].action
+          : "N/A";
+  
+      row.innerHTML = `
+        <td>${r.id}</td>
+        <td><span class="issue-badge ${issueAreaClass}">${r.issue_area}</span></td>
+        <td><span class="sentiment-badge ${r.sentiment}">${r.sentiment}</span></td>
+        <td class="path-cell">${path}</td>
+        <td>
+          <button class="action-progress-btn" data-idx="${idx}">
+            <span class="progress-label">Step ${currentStep}/${stepCount}</span>
+            <span class="progress-action">${currentAction}</span>
+          </button>
+        </td>
+        <td><button class="view-btn" data-idx="${idx}">View Details</button></td>
+      `;
+  
+      resultsBody.appendChild(row);
     });
-  });
-
-  // Action Progress handler - opens modal to Action Plan tab
-  document.querySelectorAll(".action-progress-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = e.target.closest(".action-progress-btn").dataset.idx;
-      showCaseDetails(currentResults[idx], "timeline");
+  
+    // View Details handler
+    document.querySelectorAll(".view-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = e.target.dataset.idx;
+        showCaseDetails(currentResults[idx]);
+      });
     });
-  });
-}
+  
+    // Action Progress handler - opens modal to Action Plan tab
+    document.querySelectorAll(".action-progress-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = e.target.closest(".action-progress-btn").dataset.idx;
+        showCaseDetails(currentResults[idx], "timeline");
+      });
+    });
+  }
+  
 
 function showCaseDetails(result, defaultTab = "timeline") {
   modalTitle.textContent = `Case #${result.id}`;
 
-  // Render timeline with Mark Complete button on pending step
+  // Render timeline with Mark Complete button on FIRST pending/waiting step only
+  let firstPendingFound = false;
+
   const timelineHtml =
     result.action_plan && result.action_plan.length > 0
       ? `<div class="timeline">
           ${result.action_plan
-            .map(
-              (step, i) => `
-            <div class="timeline-step ${step.status}">
-              <div class="timeline-dot"></div>
-              <div class="timeline-header">
-                <span class="timeline-action">${i + 1}. ${step.action}</span>
-                <span class="timeline-days">${
-                  step.days_from_now === 0 ? "Today" : `Day ${step.days_from_now}`
-                }</span>
-              </div>
-              <div class="timeline-desc">${step.description}</div>
-              <div class="timeline-footer">
-                <span class="timeline-status ${step.status}">${step.status}</span>
-                ${
-                  step.status === "pending"
-                    ? `<button class="mark-complete-btn" data-case-id="${result.id}">Mark Complete</button>`
-                    : ""
-                }
-              </div>
-            </div>
-          `
-            )
+            .map((step, i) => {
+              let showButton = false;
+              if ((step.status === "pending" || step.status === "waiting") && !firstPendingFound) {
+                showButton = true;
+                firstPendingFound = true;
+              }
+              return `
+                <div class="timeline-step ${step.status}">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-header">
+                    <span class="timeline-action">${i + 1}. ${step.action}</span>
+                    <span class="timeline-days">${
+                      step.days_from_now === 0 ? "Today" : `Day ${step.days_from_now}`
+                    }</span>
+                  </div>
+                  <div class="timeline-desc">${step.description}</div>
+                  <div class="timeline-footer">
+                    <span class="timeline-status ${step.status}">${step.status}</span>
+                    ${
+                      showButton
+                        ? `<button class="mark-complete-btn" data-case-id="${result.id}">Mark Complete</button>`
+                        : ""
+                    }
+                  </div>
+                </div>
+              `;
+            })
             .join("")}
         </div>`
       : `<p>No action plan available.</p>`;
@@ -239,7 +259,6 @@ function showCaseDetails(result, defaultTab = "timeline") {
         const data = await res.json();
 
         if (data.success) {
-          // Update local results
           const idx = currentResults.findIndex((r) => r.id === caseId);
           if (idx >= 0) {
             currentResults[idx] = data.case;
@@ -298,6 +317,7 @@ function showCaseDetails(result, defaultTab = "timeline") {
   modal.style.display = "flex";
 }
 
+
 // Tab switching
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("tab-btn")) {
@@ -310,6 +330,7 @@ document.addEventListener("click", (e) => {
     document.getElementById("draftsTab").style.display = tab === "drafts" ? "block" : "none";
   }
 });
+
 
 function renderHotTopics() {
   const hotTopicsSection = document.getElementById("hotTopicsSection");
@@ -333,6 +354,7 @@ function renderHotTopics() {
   document.getElementById("sentimentStats").innerHTML = renderStatBars(sentimentCounts, total);
 }
 
+
 function renderStatBars(counts, total) {
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
@@ -352,9 +374,11 @@ function renderStatBars(counts, total) {
     .join("");
 }
 
+
 closeModalBtn.addEventListener("click", () => {
   modal.style.display = "none";
 });
+
 
 modal.addEventListener("click", (e) => {
   if (e.target === modal) modal.style.display = "none";
